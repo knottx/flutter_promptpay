@@ -1,0 +1,12 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Copy example/build/web to docs",
+      "group": "build",
+      "type": "shell",
+      "command": "cp",
+      "args": ["-a", "example/build/web/.", "docs",]
+    }
+  ]
+}
