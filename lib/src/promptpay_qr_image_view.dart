@@ -2,50 +2,50 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_promptpay/flutter_promptpay.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
-class PromptPayQrImageView extends StatefulWidget {
+class PromptPayQrImageView extends StatelessWidget {
   final String accountNumber;
+  final PromptPayAccountType accountType;
   final double amount;
   final double? qrSize;
 
   const PromptPayQrImageView({
     super.key,
     required this.accountNumber,
+    required this.accountType,
     required this.amount,
     this.qrSize,
   });
 
-  @override
-  State<PromptPayQrImageView> createState() => _PromptPayQrImageViewState();
-}
+  const PromptPayQrImageView.mobileNumber({
+    super.key,
+    required this.accountNumber,
+    required this.amount,
+    this.qrSize,
+  }) : accountType = PromptPayAccountType.mobileNumber;
 
-class _PromptPayQrImageViewState extends State<PromptPayQrImageView> {
-  String data = '';
+  const PromptPayQrImageView.nationalId({
+    super.key,
+    required this.accountNumber,
+    required this.amount,
+    this.qrSize,
+  }) : accountType = PromptPayAccountType.nationalId;
 
-  @override
-  void initState() {
-    super.initState();
-    PromptPay.generate(
-      accountNumber: widget.accountNumber,
-      amount: widget.amount,
-    ).then(
-      (value) {
-        setState(() {
-          data = value;
-        });
-      },
-    );
-  }
+  const PromptPayQrImageView.eWalletId({
+    super.key,
+    required this.accountNumber,
+    required this.amount,
+    this.qrSize,
+  }) : accountType = PromptPayAccountType.eWalletId;
 
   @override
   Widget build(BuildContext context) {
-    return data.trim().isNotEmpty
-        ? QrImageView(
-            data: '',
-            size: widget.qrSize,
-          )
-        : SizedBox(
-            width: widget.qrSize,
-            height: widget.qrSize,
-          );
+    return QrImageView(
+      data: PromptPay.generate(
+        accountNumber: accountNumber,
+        accountType: accountType,
+        amount: amount,
+      ),
+      size: qrSize,
+    );
   }
 }

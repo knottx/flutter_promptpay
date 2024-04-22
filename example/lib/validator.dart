@@ -1,5 +1,3 @@
-import 'package:flutter_promptpay/flutter_promptpay.dart';
-
 class PromptPayValidator {
   /// Regular Expression: Digits `[0-9]` only.
   static final digitRegex = RegExp(r'[0-9]');
@@ -7,7 +5,7 @@ class PromptPayValidator {
   /// Validate Thai MobileNumber.
   /// 10 digits.
   /// Start With `0` and the second character is 6|8|9
-  static PromptPayErrorType? thaiMobileNumber(String? value) {
+  static String? mobileNumber(String? value) {
     final regex = RegExp(r'^0[689][0-9]{8}$');
     if (value != null &&
         value.trim().isNotEmpty &&
@@ -16,13 +14,13 @@ class PromptPayValidator {
         regex.hasMatch(value)) {
       return null;
     } else {
-      return PromptPayErrorType.invalidMobileNumber;
+      return 'Invalid Mobile Number';
     }
   }
 
   /// Validate Thai National ID.
   /// 13 digits.
-  static PromptPayErrorType? thaiNationalId(String? value) {
+  static String? nationalId(String? value) {
     if (value != null &&
         value.trim().isNotEmpty &&
         value.length == 13 &&
@@ -37,23 +35,23 @@ class PromptPayValidator {
       if (checkDigit == int.parse(value[12])) {
         return null;
       } else {
-        return PromptPayErrorType.invalidThaiNationalId;
+        return 'Invalid National ID';
       }
     } else {
-      return PromptPayErrorType.invalidThaiNationalId;
+      return 'Invalid National ID';
     }
   }
 
   /// Validate E-Wallet ID.
   /// 15 characters.
-  static PromptPayErrorType? eWalletId(String? value) {
+  static String? eWalletId(String? value) {
     if (value != null &&
         value.trim().isNotEmpty &&
         value.length == 15 &&
         digitRegex.hasMatch(value)) {
       return null;
     } else {
-      return PromptPayErrorType.invalidEWalletId;
+      return 'Invalid E-Wallet ID';
     }
   }
 }

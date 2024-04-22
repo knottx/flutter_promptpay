@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_promptpay/flutter_promptpay.dart';
+import 'package:flutter_promptpay_example/validator.dart';
 
 void main() {
   runApp(const MyApp());
@@ -38,6 +39,8 @@ class _MyHomePageState extends State<MyHomePage> {
 
   final GlobalKey<FormState> formKey = GlobalKey();
 
+  PromptPayAccountType accountType = PromptPayAccountType.mobileNumber;
+
   String accountNumberText = '';
   String amountText = '';
 
@@ -67,14 +70,50 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   Widget _body() {
+    final primaryColor = Theme.of(context).colorScheme.primary;
+    final onPrimaryColor = Theme.of(context).colorScheme.onPrimary;
     return Form(
       key: formKey,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              PromptPayAccountType.mobileNumber,
+              PromptPayAccountType.nationalId,
+              PromptPayAccountType.eWalletId,
+              PromptPayAccountType.bankAccount,
+            ]
+                .map(
+                  (e) => ChoiceChip(
+                    label: Text(
+                      e.title,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: accountType == e ? onPrimaryColor : primaryColor,
+                      ),
+                    ),
+                    selected: accountType == e,
+                    selectedColor: primaryColor,
+                    checkmarkColor: onPrimaryColor,
+                    side: BorderSide(
+                      width: 2,
+                      color: primaryColor,
+                    ),
+                    onSelected: (selected) {
+                      _onSelectedAccountType(e);
+                    },
+                  ),
+                )
+                .toList(),
+          ),
+          const SizedBox(height: 32),
           TextFormField(
             decoration: InputDecoration(
-              labelText: 'Mobile Number / Thai National ID / E-Wallet ID',
+              labelText: accountType.title,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
                 gapPadding: 4,
@@ -82,30 +121,16 @@ class _MyHomePageState extends State<MyHomePage> {
             ),
             maxLines: 1,
             keyboardType: TextInputType.number,
-            validator: (v) {
-              final value = (v ?? '').trim();
-              if (value.isNotEmpty) {
-                switch (value.length) {
-                  case 10:
-                    return PromptPayValidator.thaiMobileNumber(
-                      value,
-                    )?.toString();
-
-                  case 13:
-                    return PromptPayValidator.thaiNationalId(
-                      value,
-                    )?.toString();
-
-                  case 15:
-                    return PromptPayValidator.eWalletId(
-                      value,
-                    )?.toString();
-
-                  default:
-                    return PromptPayErrorType.invalidAccountNumber.toString();
-                }
-              } else {
-                return 'Required';
+            validator: (value) {
+              switch (accountType) {
+                case PromptPayAccountType.mobileNumber:
+                  return PromptPayValidator.mobileNumber(value);
+                case PromptPayAccountType.nationalId:
+                  return PromptPayValidator.nationalId(value);
+                case PromptPayAccountType.eWalletId:
+                  return PromptPayValidator.eWalletId(value);
+                default:
+                  return null;
               }
             },
             inputFormatters: [
@@ -113,6 +138,9 @@ class _MyHomePageState extends State<MyHomePage> {
             ],
             onSaved: (newValue) {
               accountNumberText = newValue?.trim() ?? '';
+            },
+            onChanged: (value) {
+              onChanged();
             },
           ),
           const SizedBox(height: 24),
@@ -135,6 +163,9 @@ class _MyHomePageState extends State<MyHomePage> {
             onSaved: (newValue) {
               amountText = newValue?.trim() ?? '';
             },
+            onChanged: (value) {
+              onChanged();
+            },
           ),
           const SizedBox(height: 24),
           Column(
@@ -144,6 +175,7 @@ class _MyHomePageState extends State<MyHomePage> {
                 Center(
                   child: PromptPayQrImageView(
                     accountNumber: accountNumberText,
+                    accountType: accountType,
                     amount: amount,
                     qrSize: 200,
                   ),
@@ -180,43 +212,35 @@ class _MyHomePageState extends State<MyHomePage> {
               ),
             ],
           ),
-          const SizedBox(height: 24),
-          SizedBox(
-            height: 44,
-            child: FilledButton(
-              onPressed: _onTapGenerate,
-              style: FilledButton.styleFrom(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              child: const Text('Generate'),
-            ),
-          ),
         ],
       ),
     );
   }
 
-  void _onTapGenerate() async {
+  void _onSelectedAccountType(PromptPayAccountType newAccountType) {
+    if (accountType == newAccountType) return;
+    accountType = newAccountType;
+    onChanged();
+  }
+
+  void onChanged() async {
     if (formKey.currentState!.validate()) {
       formKey.currentState!.save();
 
-      try {
-        amount = double.tryParse(amountText) ?? 0.0;
+      amount = double.tryParse(amountText) ?? 0.0;
 
-        final result = await PromptPay.generate(
-          accountNumber: accountNumberText,
-          amount: amount,
-        );
+      final result = PromptPay.generate(
+        accountNumber: accountNumberText,
+        accountType: accountType,
+        amount: amount,
+      );
 
-        setState(() {
-          promptPayQrData = result;
-        });
-      } catch (error) {
-        promptPayQrData = error.toString();
-      }
+      promptPayQrData = result;
+    } else {
+      accountNumberText = '';
+      promptPayQrData = '';
     }
+    setState(() {});
   }
 
   void _onTapCopy(
@@ -241,24 +265,23 @@ class _MyHomePageState extends State<MyHomePage> {
       ),
     );
   }
+}
 
-  void _alertError(String message) {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Error'),
-          content: Text(message),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-              child: const Text('OK'),
-            ),
-          ],
-        );
-      },
-    );
+extension PromptPayAccountTypeExtension on PromptPayAccountType {
+  String get title {
+    switch (this) {
+      case PromptPayAccountType.aid:
+        return 'AID';
+      case PromptPayAccountType.mobileNumber:
+        return 'Mobile Number';
+      case PromptPayAccountType.nationalId:
+        return 'National ID';
+      case PromptPayAccountType.eWalletId:
+        return 'E-Wallet ID';
+      case PromptPayAccountType.bankAccount:
+        return 'Bank Account';
+      case PromptPayAccountType.ota:
+        return 'OTA';
+    }
   }
 }

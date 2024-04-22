@@ -1,96 +1,132 @@
 import 'dart:convert';
 
-import 'package:flutter_promptpay/flutter_promptpay.dart';
+enum PromptPayAccountType {
+  aid,
+  mobileNumber,
+  nationalId,
+  eWalletId,
+  bankAccount,
+  ota,
+  ;
+
+  String get id {
+    switch (this) {
+      case PromptPayAccountType.aid:
+        return '00';
+      case PromptPayAccountType.mobileNumber:
+        return '01';
+      case PromptPayAccountType.nationalId:
+        return '02';
+      case PromptPayAccountType.eWalletId:
+        return '03';
+      case PromptPayAccountType.bankAccount:
+        return '04';
+      case PromptPayAccountType.ota:
+        return '05';
+    }
+  }
+}
 
 class PromptPay {
-  static Future<String> generate({
-    required String accountNumber,
+  static String mobileNumber({
+    required String mobileNumber,
     required double amount,
-  }) async {
-    try {
-      final validAccountNumber =
-          accountNumber.replaceAll(RegExp(r'(\D.*?)'), '').trim();
+  }) {
+    return generate(
+      accountNumber: _validAccountNumber(mobileNumber)
+          .replaceAll(RegExp(r'^0'), '66')
+          .padLeft(13, '0'),
+      accountType: PromptPayAccountType.mobileNumber,
+      amount: amount,
+    );
+  }
 
-      PromptPayErrorType? validate = PromptPayErrorType.invalidAccountNumber;
+  static String nationalId({
+    required String nationalId,
+    required double amount,
+  }) {
+    return generate(
+      accountNumber: _validAccountNumber(nationalId),
+      accountType: PromptPayAccountType.nationalId,
+      amount: amount,
+    );
+  }
 
-      switch (validAccountNumber.length) {
-        case 10:
-          validate = PromptPayValidator.thaiMobileNumber(
-            validAccountNumber,
-          );
-          break;
+  static String eWalletId({
+    required String eWalletId,
+    required double amount,
+  }) {
+    return generate(
+      accountNumber: _validAccountNumber(eWalletId),
+      accountType: PromptPayAccountType.eWalletId,
+      amount: amount,
+    );
+  }
 
-        case 13:
-          validate = PromptPayValidator.thaiNationalId(
-            validAccountNumber,
-          );
-          break;
+  static String _validAccountNumber(String accountNumber) {
+    return accountNumber.replaceAll(RegExp(r'[^0-9]'), '');
+  }
 
-        case 15:
-          validate = PromptPayValidator.eWalletId(
-            validAccountNumber,
-          );
-          break;
+  static String generate({
+    required String accountNumber,
+    required PromptPayAccountType accountType,
+    required double amount,
+  }) {
+    final List<String> params = [
+      /// Field `00`
+      /// Payload is `01`
+      _value(field: '00', value: '01'),
 
-        default:
-          break;
-      }
+      /// Field `01`
+      /// Type of QR
+      /// `11` is reusable.
+      /// `12` is one time use.
+      _value(
+        field: '01',
+        value: amount > 0 ? '12' : '11',
+      ),
 
-      if (validate != null) {
-        throw Exception(validate);
-      }
+      /// Field `29`
+      /// Merchant account information
+      _value(
+        field: '29',
+        value: [
+          /// Application ID PromptPay
+          _value(field: '00', value: 'A000000677010111'),
+          _value(field: accountType.id, value: accountNumber),
+        ].join(),
+      ),
 
-      final List<String> params = [
-        /// Field `00`
-        /// Payload is `01`
-        _value(field: '00', value: '01'),
+      /// Field `58`
+      /// Country is `TH`
+      _value(field: '58', value: 'TH'),
 
-        /// Field `01`
-        /// Type of QR
-        /// `11` is reusable.
-        /// `12` is one time use.
-        _value(field: '01', value: '11'),
+      /// Field `53`: Currency THB is `764`
+      /// ref: https://en.wikipedia.org/wiki/ISO_4217
+      _value(field: '53', value: '764'),
 
-        /// Field `29`
-        /// Merchant account information
+      /// Field `54`: Amount
+      if (amount > 0)
         _value(
-          field: '29',
-          value: _createMerchantAccountInfo(validAccountNumber),
+          field: '54',
+          value: amount.toStringAsFixed(2),
         ),
+    ];
 
-        /// Field `58`
-        /// Country is `TH`
-        _value(field: '58', value: 'TH'),
+    final String rawData = [
+      params.join(),
 
-        /// Field `53`: Currency THB is `764`
-        /// ref: https://en.wikipedia.org/wiki/ISO_4217
-        _value(field: '53', value: '764'),
+      /// Add Field `63`
+      /// Checksum length is 04
+      '6304',
+    ].join();
 
-        /// Field `54`: Amount
-        if (amount > 0)
-          _value(
-            field: '54',
-            value: amount.toStringAsFixed(2),
-          ),
-      ];
+    final String result = [
+      rawData,
+      _crc16(rawData).toRadixString(16).toUpperCase(),
+    ].join();
 
-      final String rawData = [
-        params.join(),
-
-        /// Add Field `63`
-        /// Checksum length is 04
-        '6304',
-      ].join();
-
-      final String result = [
-        rawData,
-        _crc16(rawData).toRadixString(16).toUpperCase(),
-      ].join();
-
-      return result;
-    } catch (error) {
-      rethrow;
-    }
+    return result;
   }
 
   static String _value({
@@ -102,31 +138,6 @@ class PromptPay {
       value.length.toString().padLeft(2, '0'),
       value,
     ].join();
-  }
-
-  static String _createMerchantAccountInfo(String validAccountNumber) {
-    return [
-      /// Application ID PromptPay
-      _value(field: '00', value: 'A000000677010111'),
-      _determineAccountType(validAccountNumber),
-    ].join();
-  }
-
-  static String _determineAccountType(String validAccountNumber) {
-    if (validAccountNumber.length >= 15) {
-      /// E-wallet ID
-      return _value(field: '03', value: validAccountNumber);
-    } else if (validAccountNumber.length >= 13) {
-      /// Thai National ID
-      return _value(field: '02', value: validAccountNumber);
-    } else {
-      /// Phone number
-      return _value(
-        field: '01',
-        value:
-            validAccountNumber.replaceAll(RegExp(r'^0'), '66').padLeft(13, '0'),
-      );
-    }
   }
 
   static int _crc16(String data) {
