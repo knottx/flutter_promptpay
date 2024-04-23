@@ -1,6 +1,6 @@
 name: flutter_promptpay
 description: Promptpay QR Code Generate
-version: 1.0.0
+version: 0.0.1
 homepage: https://knottx.github.io/flutter_promptpay
 
 environment:
