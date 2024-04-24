@@ -84,7 +84,6 @@ class _MyHomePageState extends State<MyHomePage> {
               PromptPayAccountType.mobileNumber,
               PromptPayAccountType.nationalId,
               PromptPayAccountType.eWalletId,
-              PromptPayAccountType.bankAccount,
             ]
                 .map(
                   (e) => ChoiceChip(
